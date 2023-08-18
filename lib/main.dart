@@ -28,9 +28,10 @@ class LocationScreen extends StatefulWidget {
 
 class _LocationScreenState extends State<LocationScreen> {
   final TextEditingController _locationController = TextEditingController();
-  bool _autoUpdateLocation = false;
+  bool _autoUpdateLocation = true;
   // ignore: unused_field
   String _currentLocation = '';
+ 
 
   @override
   void initState() {
@@ -38,24 +39,47 @@ class _LocationScreenState extends State<LocationScreen> {
     _getLocation();
   }
 
- Future<void> _getLocation() async {
-  try {
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+  Future<void> _getLocation() async {
+    bool locationEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!locationEnabled) {
+      // Handle if location services are disabled
+      debugPrint("Location services are disabled.");
+      return;
+    }
 
-    String newLocation = "${position.latitude}, ${position.longitude}";
-
-    setState(() {
-      if (!_autoUpdateLocation) {
-        _locationController.text = newLocation;
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        debugPrint("User denied permissions to access the device's location.");
+        return;
       }
-      _currentLocation = newLocation;
-    });
-  } catch (e) {
-    debugPrint(e.toString());
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Handle the scenario where user has permanently denied location access
+      debugPrint(
+          "User denied permissions forever to access the device's location.");
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      String newLocation = "${position.latitude}, ${position.longitude}";
+
+      setState(() {
+        if (_autoUpdateLocation) {
+          _locationController.text = newLocation;
+        }
+        _currentLocation = newLocation;
+      });
+    } catch (e) {
+      debugPrint("Error: ${e.toString()}");
+    }
   }
-}
 
   void _toggleAutoUpdate(bool value) {
     setState(() {
@@ -65,6 +89,8 @@ class _LocationScreenState extends State<LocationScreen> {
       }
     });
   }
+
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +106,7 @@ class _LocationScreenState extends State<LocationScreen> {
           children: [
             TextField(
               controller: _locationController,
-              enabled: !_autoUpdateLocation,
+              enabled: true,
               decoration: const InputDecoration(labelText: 'Location'),
             ),
             const SizedBox(height: 16.0),
