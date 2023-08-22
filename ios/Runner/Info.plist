@@ -6,6 +6,8 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Reason for accessing location</string>
 	    <!--End To request location permissions -->
+	<key>com.apple.security.network.client</key>
+    <true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

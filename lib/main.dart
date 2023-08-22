@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/plugin_api.dart';
+import 'package:latlong2/latlong.dart';
 
 void main() {
   runApp(const LocationApp());
@@ -7,6 +10,7 @@ void main() {
 
 class LocationApp extends StatelessWidget {
   const LocationApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -27,11 +31,12 @@ class LocationScreen extends StatefulWidget {
 }
 
 class _LocationScreenState extends State<LocationScreen> {
+  // Text controller for the location input field
   final TextEditingController _locationController = TextEditingController();
+  // State variable for auto updating location
   bool _autoUpdateLocation = true;
-  // ignore: unused_field
-  String _currentLocation = '';
- 
+  // State variable to hold current location
+  final List<String> _savedLocations = [];
 
   @override
   void initState() {
@@ -39,30 +44,8 @@ class _LocationScreenState extends State<LocationScreen> {
     _getLocation();
   }
 
+// Function to get the current location
   Future<void> _getLocation() async {
-    bool locationEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!locationEnabled) {
-      // Handle if location services are disabled
-      debugPrint("Location services are disabled.");
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        debugPrint("User denied permissions to access the device's location.");
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      // Handle the scenario where user has permanently denied location access
-      debugPrint(
-          "User denied permissions forever to access the device's location.");
-      return;
-    }
-
     try {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -74,13 +57,13 @@ class _LocationScreenState extends State<LocationScreen> {
         if (_autoUpdateLocation) {
           _locationController.text = newLocation;
         }
-        _currentLocation = newLocation;
       });
     } catch (e) {
       debugPrint("Error: ${e.toString()}");
     }
   }
 
+  // Function to toggle auto location updates
   void _toggleAutoUpdate(bool value) {
     setState(() {
       _autoUpdateLocation = value;
@@ -90,7 +73,28 @@ class _LocationScreenState extends State<LocationScreen> {
     });
   }
 
- 
+// Function to save the location to the list
+  void _saveLocation() {
+    setState(() {
+      _savedLocations.add(_locationController.text);
+    });
+  }
+
+  // Function to open the map screen for selecting a location
+  void _openMapForLocation() async {
+    final position = await Navigator.push<Position>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapScreen(locationText: _locationController.text),
+      ),
+    );
+    if (position != null) {
+      setState(() {
+        _locationController.text =
+            "${position.latitude}, ${position.longitude}";
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,9 +111,16 @@ class _LocationScreenState extends State<LocationScreen> {
             TextField(
               controller: _locationController,
               enabled: true,
-              decoration: const InputDecoration(labelText: 'Location'),
+              decoration: InputDecoration(
+                labelText: 'Location',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.map),
+                  onPressed: _openMapForLocation,
+                ),
+              ),
             ),
             const SizedBox(height: 16.0),
+            // Toggle switch for auto location updates
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -125,6 +136,21 @@ class _LocationScreenState extends State<LocationScreen> {
               onPressed: _getLocation,
               child: const Text('Update Location'),
             ),
+            const SizedBox(height: 16.0),
+            ElevatedButton(
+              onPressed: _saveLocation,
+              child: const Text('Save Location'),
+            ),
+            const SizedBox(height: 16.0),
+            const Text(
+              'Saved Locations:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children:
+                  _savedLocations.map((location) => Text(location)).toList(),
+            ),
           ],
         ),
       ),
@@ -132,134 +158,87 @@ class _LocationScreenState extends State<LocationScreen> {
   }
 }
 
+class MapScreen extends StatefulWidget {
+  final String locationText;
+
+  const MapScreen({Key? key, required this.locationText}) : super(key: key);
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  final MapController _mapController = MapController();
+  Position? _selectedPosition;
+  Marker? _userLocationMarker;
+
+ void _onMapTap(TapPosition point, LatLng latlng) {
+  setState(() {
+    _userLocationMarker = Marker(
+      width: 80.0,
+      height: 80.0,
+      point: latlng,
+      builder: (ctx) => const Icon(
+        Icons.location_pin,
+        color: Colors.blue,
+        size: 40.0,
+      ),
+    );
+    _selectedPosition = Position(
+      latitude: latlng.latitude,
+      longitude: latlng.longitude,
+      accuracy: 0.0,
+      altitude: 0.0,
+      heading: 0.0,
+      speed: 0.0,
+      speedAccuracy: 0.0,
+      timestamp: DateTime.now(),
+    );
+  });
+}
 
 
-
-
-
-
-// import 'package:flutter/material.dart';
-
-// void main() {
-//   runApp(const MyApp());
-// }
-
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-
-//   // This widget is the root of your application.
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Flutter Demo',
-//       theme: ThemeData(
-//         // This is the theme of your application.
-//         //
-//         // TRY THIS: Try running your application with "flutter run". You'll see
-//         // the application has a blue toolbar. Then, without quitting the app,
-//         // try changing the seedColor in the colorScheme below to Colors.green
-//         // and then invoke "hot reload" (save your changes or press the "hot
-//         // reload" button in a Flutter-supported IDE, or press "r" if you used
-//         // the command line to start the app).
-//         //
-//         // Notice that the counter didn't reset back to zero; the application
-//         // state is not lost during the reload. To reset the state, use hot
-//         // restart instead.
-//         //
-//         // This works for code too, not just values: Most code changes can be
-//         // tested with just a hot reload.
-//         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-//         useMaterial3: true,
-//       ),
-//       home: const MyHomePage(title: 'Flutter Demo Home Page'),
-//     );
-//   }
-// }
-
-// class MyHomePage extends StatefulWidget {
-//   const MyHomePage({super.key, required this.title});
-
-//   // This widget is the home page of your application. It is stateful, meaning
-//   // that it has a State object (defined below) that contains fields that affect
-//   // how it looks.
-
-//   // This class is the configuration for the state. It holds the values (in this
-//   // case the title) provided by the parent (in this case the App widget) and
-//   // used by the build method of the State. Fields in a Widget subclass are
-//   // always marked "final".
-
-//   final String title;
-
-//   @override
-//   State<MyHomePage> createState() => _MyHomePageState();
-// }
-
-// class _MyHomePageState extends State<MyHomePage> {
-//   int _counter = 0;
-
-//   void _incrementCounter() {
-//     setState(() {
-//       // This call to setState tells the Flutter framework that something has
-//       // changed in this State, which causes it to rerun the build method below
-//       // so that the display can reflect the updated values. If we changed
-//       // _counter without calling setState(), then the build method would not be
-//       // called again, and so nothing would appear to happen.
-//       _counter++;
-//     });
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // This method is rerun every time setState is called, for instance as done
-//     // by the _incrementCounter method above.
-//     //
-//     // The Flutter framework has been optimized to make rerunning build methods
-//     // fast, so that you can just rebuild anything that needs updating rather
-//     // than having to individually change instances of widgets.
-//     return Scaffold(
-//       appBar: AppBar(
-//         // TRY THIS: Try changing the color here to a specific color (to
-//         // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-//         // change color while the other colors stay the same.
-//         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-//         // Here we take the value from the MyHomePage object that was created by
-//         // the App.build method, and use it to set our appbar title.
-//         title: Text(widget.title),
-//       ),
-//       body: Center(
-//         // Center is a layout widget. It takes a single child and positions it
-//         // in the middle of the parent.
-//         child: Column(
-//           // Column is also a layout widget. It takes a list of children and
-//           // arranges them vertically. By default, it sizes itself to fit its
-//           // children horizontally, and tries to be as tall as its parent.
-//           //
-//           // Column has various properties to control how it sizes itself and
-//           // how it positions its children. Here we use mainAxisAlignment to
-//           // center the children vertically; the main axis here is the vertical
-//           // axis because Columns are vertical (the cross axis would be
-//           // horizontal).
-//           //
-//           // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-//           // action in the IDE, or press "p" in the console), to see the
-//           // wireframe for each widget.
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: <Widget>[
-//             const Text(
-//               'You have pushed the button this many times:',
-//             ),
-//             Text(
-//               '$_counter',
-//               style: Theme.of(context).textTheme.headlineMedium,
-//             ),
-//           ],
-//         ),
-//       ),
-//       floatingActionButton: FloatingActionButton(
-//         onPressed: _incrementCounter,
-//         tooltip: 'Increment',
-//         child: const Icon(Icons.add),
-//       ), // This trailing comma makes auto-formatting nicer for build methods.
-//     );
-//   }
-// }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select Location'),
+      ),
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          center: widget.locationText.isNotEmpty
+              ? LatLng(
+                  double.parse(widget.locationText.split(',')[0]),
+                  double.parse(widget.locationText.split(',')[1]),
+                )
+              : const LatLng(
+                  -6.76456, 39.2484481), // Default if input field is empty
+          maxZoom: 18,
+          zoom: 17.0,
+          onTap: _onMapTap,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.app',
+          ),
+          MarkerLayer(
+            markers: [
+              if (_userLocationMarker != null)
+                _userLocationMarker!, 
+            ],
+          ),
+        ],
+      ),
+      floatingActionButton: _selectedPosition != null
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.pop(context, _selectedPosition);
+              },
+              child: const Icon(Icons.check),
+            )
+          : null,
+    );
+  }
+}
